@@ -5,6 +5,81 @@
 #include <unistd.h>
 #include <time.h>
 
+#define ID_FILE "last_id.txt"
+
+int has_presence_today(char *filename)
+{
+  FILE *fp = fopen(filename, "r");
+  if (fp == NULL)
+  {
+    return 0;
+  }
+
+  time_t timestamp = time(NULL);
+  struct tm *local_time = localtime(&timestamp);
+  char formatted_date[11];
+  strftime(formatted_date, sizeof(formatted_date), "%Y-%m-%d", local_time);
+
+  char line[100];
+  while (fgets(line, sizeof(line), fp) != NULL)
+  {
+    char dummy_id[10], dummy_nom[20], dummy_prenom[25], dummy_date[11];
+    if (sscanf(line, "%s %s %s %s", dummy_id, dummy_nom, dummy_prenom, dummy_date) == 4 &&
+        strcmp(dummy_date, formatted_date) == 0)
+    {
+      fclose(fp);
+      return 1;
+    }
+  }
+
+  fclose(fp);
+  return 0;
+}
+
+void presenceDevWeb(Apprenant *ap)
+{
+  char prenom[25];
+  int id;
+  char nom[20];
+  FILE *fp2;
+
+  fp2 = fopen("table_presence_dev_web.txt", "at");
+  if (fp2 == NULL)
+  {
+    printf("Impossible d'ouvrir le fichier.\n");
+    exit(1);
+  }
+
+  printf("Prenom: ");
+  getchar();
+  fgets(prenom, sizeof(prenom), stdin);
+  prenom[strcspn(prenom, "\n")] = '\0';
+  printf("Nom: ");
+  fgets(nom, sizeof(nom), stdin);
+  nom[strcspn(nom, "\n")] = '\0';
+
+  time_t timestamp = time(NULL);
+  struct tm *local_time = localtime(&timestamp);
+  char formatted_time[100];
+  strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %H:%M:%S", local_time);
+
+  if (has_presence_today("table_presence_dev_web.txt"))
+  {
+    printf("Vous avez déjà marqué votre présence Dev Web aujourd'hui.\n");
+    fclose(fp2);
+    return;
+  }
+
+  id++;
+
+  fprintf(fp2, "%d %s %s %s\n", id, nom, prenom, formatted_time);
+
+  fclose(fp2);
+
+  printf("\n");
+  printf("Presence enregistrée avec succès (ID: %d)\n", id);
+}
+
 void connexion(Admin *ad, Apprenant *ap)
 {
   FILE *fp_admin, *fp_apprenant;
@@ -72,115 +147,6 @@ void connexion(Admin *ad, Apprenant *ap)
     printf("Login et/ou mot de passe incorrect(s)\n");
   }
 }
-/*void connexionAdmin(Admin *ad)
-{
-   FILE *fp1;
-   char loginR[20];
-   char *passwordR;
-   int trouvee = 0;
-   fp1 = fopen("table_login_admin.txt", "at+");
-   if (fp1 == NULL)
-   {
-     printf("Impossible d'ouvrir le fichier");
-     exit(1);
-   }
-   do
-   {
-     printf("Username (champs obligatoire): ");
-     getchar();
-     fgets(loginR, sizeof(loginR), stdin);
-   } while (strlen(loginR) == 1 && (loginR[0] == '\n' || loginR[0] == '\r'));
-
-   passwordR = getpass("Password: ");
-
-   loginR[strcspn(loginR, "\n")] = '\0';
-
-   while (!feof(fp1))
-   {
-     fscanf(fp1, "%s %s", ad->login, ad->password);
-     if ((strcmp(ad->login, loginR) == 0) && (strcmp(ad->password, passwordR) == 0))
-     {
-       trouvee = 1;
-       break;
-     }
-   }
-   fclose(fp1);
-   if (trouvee == 1)
-   {
-     menuAdmin();
-   }
-   else
-   {
-     printf("Login et/ou mot de passe incorrect(s)\n");
-   }
-}*/
-/*
-void connexionApprenant(Apprenant *ap)
-{
-  FILE *fp;
-  char loginR[20];
-  char *passwordR;
-  int trouvee = 0;
-  fp = fopen("table_login_apprenant.txt", "at+");
-  if (fp == NULL)
-  {
-    printf("Impossible d'ouvrir le fichier");
-    exit(1);
-  }
-
-  do
-  {
-    printf("Username (champs obligatoire): ");
-    getchar();
-    fgets(loginR, sizeof(loginR), stdin);
-  } while (strlen(loginR) == 1 && (loginR[0] == '\n' || loginR[0] == '\r'));
-
-  passwordR = getpass("Password: ");
-
-  loginR[strcspn(loginR, "\n")] = '\0';
-
-  while (!feof(fp))
-  {
-    fscanf(fp, "%s %s", ap->login, ap->password);
-    if ((strcmp(ap->login, loginR) == 0) && (strcmp(ap->password, passwordR) == 0))
-    {
-      trouvee = 1;
-      break;
-    }
-  }
-  fclose(fp);
-  if (trouvee == 1)
-  {
-    printf("*********************************BONJOUR %s*********************************!\n", loginR);
-    menuApprenant(ap);
-  }
-  else
-  {
-    printf("Login et/ou mot de passe incorrect(s)\n");
-  }
-}
-*/
-
-/*void connexion(Apprenant *ap, Admin *ad)
-{
-  int choixRole;
-  char loginR[20];
-  int trouvee = 0;
-  printf("##########ROLE##########\n");
-  printf("1 - ESPACE ADMINISTRATEUR\n");
-  printf("2 - ESPACE UTILISATEUR\n");
-  printf("########################\n");
-  printf("CHOIX CONNEXION: ");
-  scanf("%d", &choixRole);
-  if (choixRole == 1)
-  {
-    connexionAdmin(ad);
-  }
-  else if (choixRole == 2)
-  {
-    connexionApprenant(ap);
-  }
-}*/
 
 // presence dev web
 #include <stdio.h>
@@ -193,19 +159,25 @@ void presenceRefDig(Apprenant *ap)
   char prenom[25];
   char nom[20];
   FILE *fp3;
+
+  if (has_presence_today("table_presence_ref_dig.txt"))
+  {
+    printf("Vous avez déjà marqué votre présence Ref Dig aujourd'hui.\n");
+    return;
+  }
   fp3 = fopen("table_presence_ref_dig.txt", "at+");
   if (fp3 == NULL)
   {
-    printf("Impossible d'ouvrir le fichier.\n");
-    exit(1);
+    printf("Impossible d'ouvrir le fichier de présence (Ref Dig).\n");
+    return;
   }
+
   printf("Prenom: ");
   getchar();
   fgets(prenom, sizeof(prenom), stdin);
   prenom[strcspn(prenom, "\n")] = '\0';
   printf("Nom: ");
   fgets(nom, sizeof(nom), stdin);
-
   nom[strcspn(nom, "\n")] = '\0';
 
   time_t timestamp = time(NULL);
@@ -215,6 +187,9 @@ void presenceRefDig(Apprenant *ap)
 
   fprintf(fp3, "%s %s %s\n", nom, prenom, formatted_time);
   fclose(fp3);
+
+  printf("\n");
+  printf("Votre présence Ref Dig a été enregistrée avec succès.\n");
 }
 
 void presenceData(Apprenant *ap)
@@ -246,33 +221,30 @@ void presenceData(Apprenant *ap)
   fclose(fp4);
 }
 
-void presenceDevWeb(Apprenant *ap)
+#define ID_FILE "last_id.txt"
+
+int read_last_id()
 {
-  char prenom[25];
-  char nom[20];
-  FILE *fp2;
-  fp2 = fopen("table_presence_dev_web.txt", "at+");
-  if (fp2 == NULL)
+  FILE *fp = fopen(ID_FILE, "r");
+  int last_id = 0;
+
+  if (fp != NULL)
   {
-    printf("Impossible d'ouvrir le fichier.\n");
-    exit(1);
+    fscanf(fp, "%d", &last_id);
+    fclose(fp);
   }
-  printf("Prenom: ");
-  getchar();
-  fgets(prenom, sizeof(prenom), stdin);
-  prenom[strcspn(prenom, "\n")] = '\0';
-  printf("Nom: ");
-  fgets(nom, sizeof(nom), stdin);
 
-  nom[strcspn(nom, "\n")] = '\0';
+  return last_id;
+}
 
-  time_t timestamp = time(NULL);
-  struct tm *local_time = localtime(&timestamp);
-  char formatted_time[100];
-  strftime(formatted_time, sizeof(formatted_time), "%Y-%m-%d %H:%M:%S", local_time);
-
-  fprintf(fp2, "%s %s %s\n", nom, prenom, formatted_time);
-  fclose(fp2);
+void write_last_id(int id)
+{
+  FILE *fp = fopen(ID_FILE, "w");
+  if (fp != NULL)
+  {
+    fprintf(fp, "%d", id);
+    fclose(fp);
+  }
 }
 
 void menuApprenant(Apprenant *ap)
@@ -291,33 +263,33 @@ void menuApprenant(Apprenant *ap)
     printf("######################################################\n");
     printf("CHOIX => ");
     scanf("%d", &choix);
-    /* if (choix == 1)
-     {
-       printf("#######################################\n");
-       printf(" 1 - REF DEV WEB/MOBILE\n");
-       printf(" 2 - REF REFERENCE DIGITAL\n");
-       printf("3 - REF DATA\n");
-       printf("CHOIX => ");
-       scanf("%d", &choix1);
-       switch (choix1)
-       {
-       case 1:
-         presenceDevWeb(ap);
-         break;
+    if (choix == 1)
+    {
+      printf("#######################################\n");
+      printf(" 1 - REF DEV WEB/MOBILE\n");
+      printf(" 2 - REF REFERENCE DIGITAL\n");
+      printf("3 - REF DATA\n");
+      printf("CHOIX => ");
+      scanf("%d", &choix1);
+      switch (choix1)
+      {
+      case 1:
+        presenceDevWeb(ap);
+        break;
 
-       case 2:
-         presenceRefDig(ap);
-         break;
+      case 2:
+        presenceRefDig(ap);
+        break;
 
-       case 3:
-         presenceData(ap);
-         break;
+      case 3:
+        presenceData(ap);
+        break;
 
-       default:
-         printf("Choix invalide.\n");
-         break;
-       }
-     }*/
+      default:
+        printf("Choix invalide.\n");
+        break;
+      }
+    }
 
   } while (1);
 }
